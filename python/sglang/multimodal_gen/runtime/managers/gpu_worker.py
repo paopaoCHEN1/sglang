@@ -195,9 +195,20 @@ class GPUWorker:
 
         if self.server_args.enable_layerwise_nvtx_marker:
             pyt_hooks = PytHooks()
+            registered = False
             for module_name, module in self.pipeline.modules.items():
                 if isinstance(module, torch.nn.Module):
                     pyt_hooks.register_hooks(module, module_prefix=module_name)
+                    registered = True
+
+            diffusers_pipe = getattr(self.pipeline, "diffusers_pipe", None)
+            diffusers_components = getattr(diffusers_pipe, "components", None)
+            if not registered and isinstance(diffusers_components, dict):
+                for module_name, module in diffusers_components.items():
+                    if isinstance(module, torch.nn.Module):
+                        pyt_hooks.register_hooks(
+                            module, module_prefix=f"diffusers_pipe.{module_name}"
+                        )
 
         # apply layerwise offload after lora is applied while building LoRAPipeline
         # otherwise empty offloaded weights could fail lora converting
